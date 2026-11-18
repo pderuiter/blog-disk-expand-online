@@ -1,0 +1,61 @@
+---
+- name: Install the partitioning, LVM and XFS tools
+  ansible.builtin.package:
+    name:
+      - parted
+      - lvm2
+      - xfsprogs
+    state: present
+
+- name: Create partition 1 over the whole disk
+  community.general.parted:
+    device: "/dev/{{ item.disk }}"
+    number: "{{ item.partition }}"
+    label: gpt
+    part_end: "100%"
+    flags: "{{ ['lvm'] if item.vg is defined else [] }}"
+    state: present
+  loop: "{{ disk_expand_online_targets }}"
+  loop_control:
+    label: "{{ item.disk }}"
+  register: disk_expand_demo_parted
+  # only on first use; the partition is grown later by the post's procedure
+  when: not (ansible_facts['devices'][item.disk]['partitions'] | default({}))
+
+- name: Create the volume group on the partition
+  community.general.lvg:
+    vg: "{{ item.vg }}"
+    pvs: "/dev/{{ item.disk }}{{ item.partition }}"
+  loop: "{{ disk_expand_online_targets | selectattr('vg', 'defined') }}"
+  loop_control:
+    label: "{{ item.vg }}"
+
+- name: Create the logical volume
+  community.general.lvol:
+    vg: "{{ item.vg }}"
+    lv: "{{ item.lv }}"
+    size: "100%FREE"
+    shrink: false
+  loop: "{{ disk_expand_online_targets | selectattr('vg', 'defined') }}"
+  loop_control:
+    label: "{{ item.vg }}/{{ item.lv }}"
+
+- name: Create the filesystems
+  community.general.filesystem:
+    dev: "{{ ('/dev/' ~ item.vg ~ '/' ~ item.lv) if item.vg is defined else ('/dev/' ~ item.disk ~ item.partition) }}"
+    fstype: "{{ item.demo_fstype | default('ext4') }}"
+  loop: "{{ disk_expand_online_targets }}"
+  loop_control:
+    label: "{{ item.disk }}"
+
+- name: Mount the filesystems
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: >-
+      {{ ('/dev/mapper/' ~ item.vg | replace('-', '--') ~ '-' ~ item.lv | replace('-', '--'))
+         if item.vg is defined else ('/dev/' ~ item.disk ~ item.partition) }}
+    fstype: "{{ item.demo_fstype | default('ext4') }}"
+    state: mounted
+  loop: "{{ disk_expand_online_targets }}"
+  loop_control:
+    label: "{{ item.mount }}"

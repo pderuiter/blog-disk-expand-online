@@ -1,0 +1,19 @@
+---
+# The VM from terraform/ has three disks: sda (OS), sdb and sdc. disk_expand_demo puts the two
+# layouts from the post on them: sdb1 as an LVM PV (vg_data/lv_data, ext4 on /data) and
+# sdc1 with XFS directly on the partition (/srv). Grow sdb and sdc at the hypervisor, then
+# run site.yml again. On your own machine set disk_expand_demo_enabled: false and describe
+# your disks, for example the post's sda2 with LVM:
+#   - {disk: sda, partition: 2, vg: ubuntu-vg, lv: ubuntu-lv, mount: /}
+disk_expand_demo_enabled: true
+
+disk_expand_online_targets:
+  - disk: sdb
+    partition: 1
+    vg: vg_data
+    lv: lv_data
+    mount: /data
+  - disk: sdc
+    partition: 1
+    mount: /srv
+    demo_fstype: xfs

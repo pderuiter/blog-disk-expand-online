@@ -1,0 +1,8 @@
+---
+disk_expand_online_packages:
+  Debian:
+    - lvm2
+    - cloud-guest-utils  # growpart
+  RedHat:
+    - lvm2
+    - cloud-utils-growpart

@@ -1,0 +1,19 @@
+---
+# Step 3: growpart comes from cloud-guest-utils (Debian/Ubuntu) or cloud-utils-growpart (RHEL).
+- name: Install growpart and the LVM tools
+  ansible.builtin.package:
+    name: "{{ disk_expand_online_packages[ansible_facts['os_family']] }}"
+    state: present
+
+- name: Scan the SCSI hosts for new disks
+  ansible.builtin.shell:
+    cmd: 'for host in /sys/class/scsi_host/*; do echo "- - -" > "$host/scan"; done'
+  changed_when: false
+  when: disk_expand_online_scan_new | bool
+
+- name: Expand each disk
+  ansible.builtin.include_tasks: expand.yml
+  loop: "{{ disk_expand_online_targets }}"
+  loop_control:
+    loop_var: disk_expand_online_target
+    label: "{{ disk_expand_online_target.disk }}"

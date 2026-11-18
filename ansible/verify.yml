@@ -1,0 +1,42 @@
+---
+# Step 5 of the post (df -h), as an assertion: every filesystem fills its disk. Read-only.
+- name: Verify the expanded disks
+  hosts: lvm_hosts
+  become: true
+  tasks:
+    - name: Read the disk sizes
+      ansible.builtin.command:
+        cmd: "lsblk --noheadings --nodeps --bytes --output SIZE /dev/{{ item.disk }}"
+      loop: "{{ disk_expand_online_targets }}"
+      loop_control:
+        label: "{{ item.disk }}"
+      register: verify_disks
+      changed_when: false
+
+    - name: Read the filesystem sizes (df)
+      ansible.builtin.command:
+        cmd: "df --output=size,target --block-size=1 {{ item.mount }}"
+      loop: "{{ disk_expand_online_targets }}"
+      loop_control:
+        label: "{{ item.mount }}"
+      register: verify_df
+      changed_when: false
+
+    - name: Assert that each filesystem uses at least 90% of its disk
+      ansible.builtin.assert:
+        that:
+          - (item.1.stdout_lines[-1].split()[0] | int) > (item.0.stdout | int) * 0.9
+        fail_msg: >-
+          {{ item.1.item.mount }} is {{ item.1.stdout_lines[-1].split()[0] | int | human_readable }}
+          on a {{ item.0.stdout | int | human_readable }} disk
+        quiet: true
+      loop: "{{ verify_disks.results | zip(verify_df.results) | list }}"
+      loop_control:
+        label: "{{ item.1.item.mount }}"
+
+    - name: Show the result
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines[-1] }}"
+      loop: "{{ verify_df.results }}"
+      loop_control:
+        label: "{{ item.item.mount }}"

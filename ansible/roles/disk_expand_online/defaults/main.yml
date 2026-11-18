@@ -1,0 +1,16 @@
+---
+# Disks that were grown at the hypervisor, and what sits on them. One entry per disk:
+#   disk:      kernel name of the disk (sda)
+#   partition: partition number to grow (2); leave it out when LVM or the filesystem uses the whole disk
+#   vg, lv:    for LVM: the PV on the partition (or disk) is resized and the LV gets all free space
+#   mount:     mount point of the filesystem (used for XFS, which is grown through the mount point)
+# Without vg/lv the filesystem on the partition (or disk) itself is grown (ext4 or XFS).
+disk_expand_online_targets:
+  - disk: sda
+    partition: 2
+    vg: vg_name
+    lv: lv_name
+    mount: /
+
+# Also scan every SCSI host for disks that were added (echo "- - -" > /sys/class/scsi_host/*/scan).
+disk_expand_online_scan_new: false

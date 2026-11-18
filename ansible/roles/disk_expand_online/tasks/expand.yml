@@ -1,0 +1,53 @@
+---
+- name: Set the device names for {{ disk_expand_online_target.disk }}
+  ansible.builtin.set_fact:
+    disk_expand_online_dev: >-
+      /dev/{{ disk_expand_online_target.disk }}{{ (('p' if disk_expand_online_target.disk[-1] is match('[0-9]') else '')
+      ~ disk_expand_online_target.partition) if disk_expand_online_target.partition is defined else '' }}
+    disk_expand_online_lvm: "{{ disk_expand_online_target.vg is defined }}"
+
+# Step 2: echo 1 > /sys/block/sdX/device/rescan
+- name: Rescan the disk so the kernel sees its new size
+  ansible.builtin.shell:
+    cmd: "echo 1 > /sys/block/{{ disk_expand_online_target.disk }}/device/rescan"
+  changed_when: false
+
+# Step 3: growpart /dev/sdX N (exit code 1 with NOCHANGE: the partition already fills the disk)
+- name: Grow the partition
+  ansible.builtin.command:
+    cmd: "growpart /dev/{{ disk_expand_online_target.disk }} {{ disk_expand_online_target.partition }}"
+  register: disk_expand_online_growpart
+  when: disk_expand_online_target.partition is defined
+  changed_when: disk_expand_online_growpart.rc == 0
+  failed_when: disk_expand_online_growpart.rc != 0 and 'NOCHANGE' not in disk_expand_online_growpart.stdout
+
+# Step 4, LVM: pvresize, then lvextend -l +100%FREE and resize2fs / xfs_growfs
+- name: Resize the physical volume
+  community.general.lvm_pv:
+    device: "{{ disk_expand_online_dev }}"
+    resize: true
+  when: disk_expand_online_lvm | bool
+
+- name: Extend the logical volume and its filesystem
+  community.general.lvol:
+    vg: "{{ disk_expand_online_target.vg }}"
+    lv: "{{ disk_expand_online_target.lv }}"
+    size: "+100%FREE"
+    resizefs: true
+    shrink: false
+  when: disk_expand_online_lvm | bool
+
+# Step 4, filesystem on the partition: resize2fs /dev/sdXN or xfs_growfs /mountpoint
+- name: Read the filesystem type
+  ansible.builtin.command:
+    cmd: "lsblk --noheadings --nodeps --output FSTYPE {{ disk_expand_online_dev }}"
+  register: disk_expand_online_fstype
+  changed_when: false
+  when: not disk_expand_online_lvm | bool
+
+- name: Grow the filesystem
+  community.general.filesystem:
+    dev: "{{ disk_expand_online_dev }}"
+    fstype: "{{ disk_expand_online_fstype.stdout | trim }}"
+    resizefs: true
+  when: not disk_expand_online_lvm | bool

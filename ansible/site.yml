@@ -1,0 +1,13 @@
+---
+- name: Expand disk space without rebooting
+  hosts: lvm_hosts
+  become: true
+  tasks:
+    - name: Create the practice partitions and filesystems
+      ansible.builtin.include_role:
+        name: disk_expand_demo
+      when: disk_expand_demo_enabled | bool
+
+    - name: Rescan, grow the partitions and resize LVM and filesystems
+      ansible.builtin.include_role:
+        name: disk_expand_online

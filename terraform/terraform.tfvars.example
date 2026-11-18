@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and adjust. Never commit real values.
+proxmox_endpoint  = "https://pve.example.com:8006/"
+proxmox_api_token = "terraform@pve!blog=00000000-0000-0000-0000-000000000000"
+node_name         = "pve"
+datastore_id      = "local-lvm"
+gateway           = "10.0.10.1"
+dns_servers       = ["10.0.10.1"]
+ssh_public_key    = "ssh-ed25519 AAAA... you@example.com"
+
+vms = {
+  lvm01 = {
+    addresses = ["10.0.10.31/24"]
+    # sdb: LVM on sdb1; sdc: XFS on sdc1. Step 1 of the post (grow the disk at the hypervisor):
+    # raise these sizes, e.g. to [20, 20], and run terraform apply. Proxmox grows the disks
+    # while the VM keeps running; then run site.yml again.
+    data_disks = [10, 10]
+    groups     = ["lvm_hosts"]
+  }
+}

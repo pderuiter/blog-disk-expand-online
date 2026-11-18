@@ -1,0 +1,5 @@
+---
+# Optional practice setup on blank disks, in the two layouts the post covers. Each target
+# gets partition 1 over the whole disk, then either LVM (PV on the partition, a VG and an LV
+# with a filesystem) or a filesystem directly on the partition. Uses disk_expand_online_targets.
+disk_expand_demo_enabled: false
